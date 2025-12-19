@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Be Water — p5.js (Bruce Lee)</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #060606;
+      }
+      canvas {
+        display: block;
+      }
+      .hint {
+        position: fixed;
+        left: 10px;
+        top: 10px;
+        color: #ddd;
+        font-family: system-ui;
+        font-size: 13px;
+        background: rgba(0, 0, 0, 0.25);
+        padding: 6px 8px;
+        border-radius: 6px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="hint">C: clear · F: fullscreen · Clique: strike</div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
+    <script>
+      /*
+  "Be water" — p5.js sketch inspired by Bruce Lee.
+  Principes:
+   - simplicité (peu de règles)
+   - efficacité (mouvement guidé par un champ de flux)
+   - adaptabilité (interaction directe)
+*/
+
+      let particles = [];
+      let cols, rows;
+      let scl = 20; // taille d'échantillonnage du champ
+      let flowfield = [];
+      let zoff = 0;
+      let inc = 0.12;
+      let N_PARTICLES = 800;
+
+      function setup() {
+        createCanvas(windowWidth, windowHeight);
+        background(6);
+        colorMode(HSB, 360, 100, 100, 100);
+        cols = floor(width / scl);
+        rows = floor(height / scl);
+        flowfield = new Array(cols * rows);
+        for (let i = 0; i < N_PARTICLES; i++) particles.push(new Particle());
+        strokeCap(ROUND);
+      }
+
+      function draw() {
+        // léger fondu pour garder des traînées (comme des mouvements enregistrés)
+        noStroke();
+        fill(6, 6, 6, 6);
+        rect(0, 0, width, height);
+
+        // construire le champ de flux (Perlin noise)
+        let yoff = 0;
+        for (let y = 0; y < rows; y++) {
+          let xoff = 0;
+          for (let x = 0; x < cols; x++) {
+            let index = x + y * cols;
+            let angle = noise(xoff, yoff, zoff) * TWO_PI * 2.0; // deux tours
+            let v = p5.Vector.fromAngle(angle);
+            v.setMag(1.0);
+            flowfield[index] = v;
+            xoff += inc;
+          }
+          yoff += inc;
+        }
+        zoff += 0.003;
+
+        // appliquer le champ aux particules
+        for (let p of particles) {
+          p.follow(flowfield);
+          p.update();
+          p.edges();
+          p.show();
+        }
+      }
+
+      // Particule guidée par le champ
+      class Particle {
+        constructor() {
+          this.pos = createVector(random(width), random(height));
+          this.vel = createVector(0, 0);
+          this.acc = createVector(0, 0);
+          this.maxspeed = random(2, 4);
+          this.prevPos = this.pos.copy();
+          this.h = random(200, 320); // teinte (bleu-vert)
+          this.thickness = random(0.8, 2.4);
+        }
+        update() {
+          this.vel.add(this.acc);
+          this.vel.limit(this.maxspeed);
+          this.pos.add(this.vel);
+          this.acc.mult(0);
+        }
+        applyForce(f) {
+          this.acc.add(f);
+        }
+        follow(flow) {
+          let x = floor(constrain(this.pos.x / scl, 0, cols - 1));
+          let y = floor(constrain(this.pos.y / scl, 0, rows - 1));
+          let index = x + y * cols;
+          let force = flow[index];
+          if (force) this.applyForce(force);
+        }
+        show() {
+          strokeWeight(this.thickness);
+          stroke(this.h, 70, 85, 80);
+          point(this.pos.x, this.pos.y);
+        }
+        edges() {
+          if (this.pos.x > width) this.pos.x = 0;
+          if (this.pos.x < 0) this.pos.x = width;
+          if (this.pos.y > height) this.pos.y = 0;
+          if (this.pos.y < 0) this.pos.y = height;
+        }
+      }
+
+      // Interaction directe - "strike" : repoussement radial depuis la souris
+      function mousePressed() {
+        let center = createVector(mouseX, mouseY);
+        for (let p of particles) {
+          let d = p5.Vector.dist(p.pos, center);
+          if (d < 160) {
+            let force = p5.Vector.sub(p.pos, center);
+            force.normalize();
+            // force plus forte près du centre (comme un coup concentré)
+            force.mult(map(d, 0, 160, 8, 0.2));
+            p.applyForce(force);
+            // un petit boost de vitesse pour accentuer la frappe
+            p.vel.add(force.mult(0.4));
+          }
+        }
+      }
+
+      // commandes clavier
+      function keyPressed() {
+        if (key === "c" || key === "C") {
+          background(6); // remettre à zéro (calme)
+        } else if (key === "f" || key === "F") {
+          let fs = !document.fullscreenElement;
+          if (fs) fullscreen(true);
+        }
+      }
+
+      function windowResized() {
+        resizeCanvas(windowWidth, windowHeight);
+        cols = floor(width / scl);
+        rows = floor(height / scl);
+        flowfield = new Array(cols * rows);
+      }
+    </script>
+  </body>
+</html>

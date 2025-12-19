@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>Be Water — pas de disparition + séparation</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #020205;
+        font-family: system-ui;
+        color: #eee;
+      }
+      canvas {
+        display: block;
+      }
+      .ui {
+        position: fixed;
+        left: 10px;
+        top: 10px;
+        background: rgba(0, 0, 0, 0.28);
+        padding: 10px 12px;
+        border-radius: 10px;
+        z-index: 20;
+        font-size: 13px;
+      }
+      .ui label {
+        display: block;
+        margin-bottom: 6px;
+      }
+      .ui input[type="range"] {
+        width: 200px;
+      }
+      .hint {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="ui">
+      <label>Nombre de particules: <span id="countVal">1800</span></label>
+      <input
+        id="countSlider"
+        type="range"
+        min="200"
+        max="4000"
+        step="50"
+        value="1800"
+      />
+      <label>Taille particules: <span id="sizeVal">1.6</span></label>
+      <input
+        id="sizeSlider"
+        type="range"
+        min="0.4"
+        max="4.0"
+        step="0.1"
+        value="1.6"
+      />
+      <label>Persistance (trail alpha): <span id="trailVal">6</span></label>
+      <input
+        id="trailSlider"
+        type="range"
+        min="0"
+        max="30"
+        step="1"
+        value="6"
+      />
+      <label
+        >Séparation (éviter superposition): <span id="sepVal">0.9</span></label
+      >
+      <input
+        id="sepSlider"
+        type="range"
+        min="0"
+        max="2.6"
+        step="0.05"
+        value="0.9"
+      />
+      <div class="hint">
+        Moins de persistance → particules visibles en permanence. Augmente
+        séparation pour éviter qu'elles se chevauchent.
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/addons/p5.sound.min.js"></script>
+
+    <script>
+      /*
+  Version :  - pas d'illusion de "disparition" (contrôle de la persistance),
+             - séparation entre particules via spatial hash,
+             - sliders : count, size, trailAlpha, separationStrength.
+  Basé sur les versions précédentes (flux Perlin, répulsion souris, son).
+*/
+
+      let particles = [];
+      let cols, rows;
+      let scl = 18;
+      let flowfield = [];
+      let zoff = 0;
+      let inc = 0.11;
+
+      let N_PARTICLES = 1800;
+      let PARTICLE_SIZE_SCALE = 1.6;
+      let TRAIL_ALPHA = 6; // plus petit = plus de persistance (0 = persistance totale)
+      let SEPARATION_STRENGTH = 0.9; // multiplicateur de la force de séparation
+
+      // spatial hash
+      let cellSize = 26; // taille cellule pour hash
+      let grid = {}; // mapping "cx,cy" -> array of particle indices
+
+      // UI
+      let countSlider, sizeSlider, trailSlider, sepSlider;
+      let countValSpan, sizeValSpan, trailValSpan, sepValSpan;
+
+      // souris / activité
+      let activity = 0;
+      let mouseSpeed = 0;
+      let prevMouseX = 0,
+        prevMouseY = 0;
+      const INFLUENCE_RADIUS = 25;
+      const MOUSE_FORCE_SCALE = 0.18;
+      const CLICK_MULTIPLIER = 2.5;
+      const ACTIVITY_DECAY = 0.985;
+
+      // son (léger)
+      let splashNoise, splashEnv, splashFilter;
+
+      function setup() {
+        createCanvas(windowWidth, windowHeight);
+        colorMode(HSB, 360, 100, 100, 100);
+        background(10);
+
+        cols = floor(width / scl);
+        rows = floor(height / scl);
+        flowfield = new Array(cols * rows);
+
+        for (let i = 0; i < N_PARTICLES; i++) particles.push(new Particle());
+
+        // UI hookup
+        countSlider = select("#countSlider");
+        sizeSlider = select("#sizeSlider");
+        trailSlider = select("#trailSlider");
+        sepSlider = select("#sepSlider");
+        countValSpan = select("#countVal");
+        sizeValSpan = select("#sizeVal");
+        trailValSpan = select("#trailVal");
+        sepValSpan = select("#sepVal");
+
+        countValSpan.html(N_PARTICLES);
+        sizeValSpan.html(PARTICLE_SIZE_SCALE.toFixed(1));
+        trailValSpan.html(TRAIL_ALPHA);
+        sepValSpan.html(SEPARATION_STRENGTH.toFixed(2));
+
+        countSlider.input(() => {
+          const newCount = int(countSlider.value());
+          countValSpan.html(newCount);
+          adjustParticleCount(newCount);
+        });
+        sizeSlider.input(() => {
+          PARTICLE_SIZE_SCALE = float(sizeSlider.value());
+          sizeValSpan.html(PARTICLE_SIZE_SCALE.toFixed(1));
+        });
+        trailSlider.input(() => {
+          TRAIL_ALPHA = int(trailSlider.value());
+          trailValSpan.html(TRAIL_ALPHA);
+        });
+        sepSlider.input(() => {
+          SEPARATION_STRENGTH = float(sepSlider.value());
+          sepValSpan.html(SEPARATION_STRENGTH.toFixed(2));
+        });
+
+        // son
+        userStartAudio();
+        splashNoise = new p5.Noise("white");
+        splashFilter = new p5.BandPass();
+        splashEnv = new p5.Env();
+        splashEnv.setADSR(0.001, 0.06, 0.0, 0.25);
+        splashEnv.setRange(1.0, 0);
+        splashNoise.disconnect();
+        splashNoise.connect(splashFilter);
+        splashFilter.freq(400);
+        splashFilter.res(6);
+        splashNoise.start();
+
+        prevMouseX = mouseX;
+        prevMouseY = mouseY;
+      }
+
+      // ---------- main ----------
+      function draw() {
+        // fond semi transparent : pilotable par TRAIL_ALPHA
+        noStroke();
+        fill(10, 10, 10, TRAIL_ALPHA);
+        rect(0, 0, width, height);
+
+        // construire flowfield (Perlin)
+        let yoff = 0;
+        for (let y = 0; y < rows; y++) {
+          let xoff = 0;
+          for (let x = 0; x < cols; x++) {
+            let index = x + y * cols;
+            let angle = noise(xoff, yoff, zoff) * TWO_PI * 2.0;
+            let v = p5.Vector.fromAngle(angle);
+            v.setMag(0.6);
+            flowfield[index] = v;
+            xoff += inc;
+          }
+          yoff += inc;
+        }
+        zoff += 0.003 * (0.2 + activity * 1.2);
+
+        // calcul vitesse souris
+        let dx = mouseX - prevMouseX;
+        let dy = mouseY - prevMouseY;
+        mouseSpeed = sqrt(dx * dx + dy * dy);
+        let targetActivity = constrain(map(mouseSpeed, 0, 80, 0, 1), 0, 1);
+        activity = max(targetActivity, activity * ACTIVITY_DECAY);
+        activity = lerp(activity, targetActivity, 0.18);
+
+        // rebuild spatial hash (clear then fill)
+        grid = {};
+        for (let i = 0; i < particles.length; i++) {
+          let p = particles[i];
+          let cx = floor(p.pos.x / cellSize);
+          let cy = floor(p.pos.y / cellSize);
+          let key = cx + "," + cy;
+          if (!grid[key]) grid[key] = [];
+          grid[key].push(i);
+        }
+
+        // update particles (separation via neighbors in grid)
+        for (let i = 0; i < particles.length; i++) {
+          let p = particles[i];
+
+          // follow flowfield if active
+          if (activity > 0.01) p.follow(flowfield);
+          else p.applyDamping(0.96);
+
+          // separation from neighbors
+          applySeparation(i, p);
+
+          // avoid mouse
+          p.avoidMouse(createVector(mouseX, mouseY), mouseSpeed);
+
+          p.update();
+          p.confineAndBounce();
+          p.show(activity);
+        }
+
+        prevMouseX = mouseX;
+        prevMouseY = mouseY;
+      }
+
+      // ---------- séparation optimisée via grille ----------
+      function applySeparation(index, p) {
+        // paramètre de rayon de séparation (visuel) ; plus petit = particules "collent" moins
+        let sepRadius = 12; // en pixels
+        let cx = floor(p.pos.x / cellSize);
+        let cy = floor(p.pos.y / cellSize);
+
+        // vérifier 9 cellules proches
+        for (let ox = -1; ox <= 1; ox++) {
+          for (let oy = -1; oy <= 1; oy++) {
+            let key = cx + ox + "," + (cy + oy);
+            let bucket = grid[key];
+            if (!bucket) continue;
+            for (let j = 0; j < bucket.length; j++) {
+              let otherIdx = bucket[j];
+              if (otherIdx === index) continue;
+              let other = particles[otherIdx];
+              let d = p5.Vector.dist(p.pos, other.pos);
+              if (d > 0 && d < sepRadius) {
+                // vecteur de répulsion (loin de l'autre)
+                let push = p5.Vector.sub(p.pos, other.pos);
+                push.normalize();
+                // intensité dépend de proximité : proche -> fort
+                let strength = (1 - d / sepRadius) * SEPARATION_STRENGTH * 0.8;
+                // appliquer une petite force de séparation
+                push.mult(strength * 0.6);
+                p.applyForce(push);
+                // petit correctif pour la vélocité afin d'éviter agrégation
+                p.vel.add(push.mult(0.12));
+              }
+            }
+          }
+        }
+      }
+
+      // ---------- Particle ----------
+      class Particle {
+        constructor() {
+          this.pos = createVector(random(width), random(height));
+          this.vel = createVector(0, 0);
+          this.acc = createVector(0, 0);
+          this.maxspeed = random(1.2, 3.2);
+          this.h = random(200, 320);
+          this.thicknessBase = random(0.6, 2.4);
+        }
+        applyForce(f) {
+          this.acc.add(f);
+        }
+        applyDamping(d) {
+          this.vel.mult(d);
+          if (this.vel.mag() < 0.03) this.vel.set(0, 0);
+        }
+        follow(flow) {
+          let x = floor(constrain(this.pos.x / scl, 0, cols - 1));
+          let y = floor(constrain(this.pos.y / scl, 0, rows - 1));
+          let index = x + y * cols;
+          let force = flow[index];
+          if (force) {
+            let f = p5.Vector.mult(force, 0.25 + activity * 1.1);
+            this.applyForce(f);
+          }
+        }
+        avoidMouse(mousePos, mSpeed) {
+          let d = p5.Vector.dist(this.pos, mousePos);
+          if (d < INFLUENCE_RADIUS) {
+            let dir = p5.Vector.sub(this.pos, mousePos);
+            dir.normalize();
+            let prox = constrain(map(d, 0, INFLUENCE_RADIUS, 1, 0), 0, 1);
+            let msNorm = constrain(map(mSpeed, 0, 100, 0, 1), 0, 1);
+            let mag = (0.2 + msNorm * 6.0) * prox * MOUSE_FORCE_SCALE;
+            this.applyForce(p5.Vector.mult(dir, mag));
+            this.vel.add(p5.Vector.mult(dir, mag * 0.8));
+          } else {
+            this.applyDamping(0.995);
+          }
+        }
+        update() {
+          this.vel.add(this.acc);
+          this.vel.limit(this.maxspeed + activity * 2.0);
+          this.pos.add(this.vel);
+          this.acc.mult(0);
+        }
+        confineAndBounce() {
+          // rebond + perte d'énergie -> restent visibles, pas de wrap
+          if (this.pos.x > width - 1) {
+            this.pos.x = width - 1;
+            this.vel.x *= -0.8;
+          } else if (this.pos.x < 1) {
+            this.pos.x = 1;
+            this.vel.x *= -0.8;
+          }
+          if (this.pos.y > height - 1) {
+            this.pos.y = height - 1;
+            this.vel.y *= -0.8;
+          } else if (this.pos.y < 1) {
+            this.pos.y = 1;
+            this.vel.y *= -0.8;
+          }
+        }
+        show(globalActivity) {
+          let size = this.thicknessBase * PARTICLE_SIZE_SCALE * 2.2;
+          let alpha = constrain(
+            20 + globalActivity * 80 + this.vel.mag() * 18,
+            8,
+            100
+          );
+          noStroke();
+          fill(this.h, 70, 86, alpha);
+          ellipse(this.pos.x, this.pos.y, size, size);
+        }
+      }
+
+      // ---------- interactions ----------
+      function mousePressed() {
+        let center = createVector(mouseX, mouseY);
+        for (let p of particles) {
+          let d = p5.Vector.dist(p.pos, center);
+          if (d < INFLUENCE_RADIUS * 1.2) {
+            let force = p5.Vector.sub(p.pos, center);
+            force.normalize();
+            let prox = constrain(map(d, 0, INFLUENCE_RADIUS * 1.2, 1, 0), 0, 1);
+            force.mult(6.5 * prox * MOUSE_FORCE_SCALE * CLICK_MULTIPLIER);
+            p.applyForce(force);
+            p.vel.add(force.mult(0.6));
+          }
+        }
+        triggerSplash(min(map(mouseSpeed, 0, 200, 0.06, 1.2), 1.2));
+      }
+      function mouseMoved() {
+        if (mouseSpeed > 2.5) {
+          triggerSplash(
+            constrain(map(mouseSpeed, 2.5, 120, 0.02, 0.8), 0.02, 0.9)
+          );
+        }
+      }
+      function triggerSplash(power) {
+        if (!splashEnv || !splashNoise) return;
+        let freq = constrain(220 + power * 2200, 220, 4000);
+        splashFilter.freq(freq);
+        splashFilter.res(constrain(3 + power * 12, 3, 18));
+        splashEnv.setRange(power, 0);
+        splashEnv.play(splashFilter);
+      }
+
+      // ---------- util : ajuster le nombre ----------
+      function adjustParticleCount(newCount) {
+        newCount = int(newCount);
+        let cur = particles.length;
+        if (newCount > cur) {
+          let toAdd = newCount - cur;
+          for (let i = 0; i < toAdd; i++) particles.push(new Particle());
+        } else if (newCount < cur) {
+          particles.splice(newCount, cur - newCount);
+        }
+      }
+
+      // ---------- resize & keys ----------
+      function keyPressed() {
+        if (key === "c" || key === "C") background(10);
+        else if (key === "f" || key === "F")
+          fullscreen(!document.fullscreenElement);
+      }
+      function windowResized() {
+        resizeCanvas(windowWidth, windowHeight);
+        cols = floor(width / scl);
+        rows = floor(height / scl);
+        flowfield = new Array(cols * rows);
+      }
+    </script>
+  </body>
+</html>
