@@ -95,8 +95,8 @@ où j’ai pu constater qu’il existait une majorité de formes simples à gén
 En prenant en compte uniquement les formes simples, j’ai créé une série de formes monochromes, dont un dérivé du cercle ressemblant à l’icône Pac-Man.
 
 <p align="center">
-<img src="/img/Pacman(1).png" width="48%">
-<img src="/img/Pacman(2).png" width="48%">
+<img src="/img/Pacman(1).png" width="28%">
+<img src="/img/Pacman(2).png" width="38%">
 </p>
 
 À l’aide de l’IA ChatGPT, j’ai créé une animation de Pac-Man en animant proportionnellement l’angle de départ du cercle et son angle de balayage.
