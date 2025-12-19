@@ -36,7 +36,7 @@ Ce résultat ne donnait pas de déplacement proportionnel.
 
 <img src="/img/projet1(1).png" width="78%">
 <video width="75%" controls loop muted playsinline>
-  <source src="./mov/expérimentation1_P1.mp4" type="video/mp4">
+  <source src="/mov/expérimentation1_P1.mp4" type="video/mp4">
 </video>
 
 
@@ -44,7 +44,7 @@ Avec les conseils de mon intervenante, j’ai finalement défini les limites aut
 
 <img src="/img/projet1(2).png" width="78%">
 <video width="75%" controls loop muted playsinline>
-  <source src="./mov/expérimentation1_P2.mp4" type="video/mp4">
+  <source src="/mov/expérimentation1_P2.mp4" type="video/mp4">
 </video>
 
 ### Conclusion
@@ -113,7 +113,7 @@ J’ai complété l’animation en créant une boucle infinie de déplacement de
 Pour finir, j’ai ajouté « difficilement » du son pour donner plus de vie au personnage.
 
   <video width="75%" controls loop muted playsinline>
-  <source src="./mov/Pac-Man.mp4" type="video/mp4">
+  <source src="/mov/Pac-Man.mp4" type="video/mp4">
 
 ### Conclusion
 
