@@ -112,7 +112,6 @@ J’ai complété l’animation en créant une boucle infinie de déplacement de
 
 Pour finir, j’ai ajouté « difficilement » du son pour donner plus de vie au personnage.
 
-<video width="100%" autoplay loop muted>
   <video width="75%" controls loop muted playsinline>
   <source src="./mov/Pac-Man.mp4" type="video/mp4">
 
