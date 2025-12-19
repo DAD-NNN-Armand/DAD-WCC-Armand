@@ -13,8 +13,7 @@
 Mon projet personnel se concentre sur la bande dessinée numérique et interactive.  
 À la suite de plusieurs projets précédents ce workshop, j’ai voulu poursuivre cette lancée en expérimentant des méthodes que je n’avais pas encore abordées.
 
-Je me base actuellement sur le projet de fin d’étude d’Anthony Rageul  
-[_Prise de tête_](https://prisedetete.net/).  
+Je me base actuellement sur le projet de fin d’étude d’Anthony Rageul [_Prise de tête_](https://prisedetete.net/).  
 Une courte bande dessinée réalisée en 2009 où l’étudiant a tenté de percer le potentiel du genre narratif par le biais des outils de base de l’interactivité navigationnelle (hover, clic ou drag and drop).
 
 <p align="center">
