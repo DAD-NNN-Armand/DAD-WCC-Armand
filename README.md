@@ -35,10 +35,17 @@ J’ai d’abord tenté de contraindre les déplacements avec des limites fixes 
 Ce résultat ne donnait pas de déplacement proportionnel.
 
 <img src="/img/projet1(1).png" width="78%">
+<video width="75%" controls loop muted playsinline>
+  <source src="./mov/expérimentation1_P1.mp4" type="video/mp4">
+</video>
+
 
 Avec les conseils de mon intervenante, j’ai finalement défini les limites automatiques avec des calculs dynamiques à partir de la taille de la fenêtre et de l’image.
 
 <img src="/img/projet1(2).png" width="78%">
+<video width="75%" controls loop muted playsinline>
+  <source src="./mov/expérimentation1_P2.mp4" type="video/mp4">
+</video>
 
 ### Conclusion
 
@@ -104,6 +111,10 @@ En prenant en compte uniquement les formes simples, j’ai créé une série de 
 J’ai complété l’animation en créant une boucle infinie de déplacement de Pac-Man sur la page.
 
 Pour finir, j’ai ajouté « difficilement » du son pour donner plus de vie au personnage.
+
+<video width="100%" autoplay loop muted>
+  <video width="75%" controls loop muted playsinline>
+  <source src="./mov/Pac-Man.mp4" type="video/mp4">
 
 ### Conclusion
 
