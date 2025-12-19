@@ -40,7 +40,7 @@ Ce résultat ne donnait pas de déplacement proportionnel.
   <source src="/mov/expérimentation1_P1.mp4" type="video/mp4">
 </video>
 
-Avec les conseils de mon intervenante, j’ai finalement défini les limites automatiques avec des calculs dynamiques à partir de la taille de la fenêtre et de l’image.
+Avec les bons conseils de mon intervenante, j’ai finalement défini les limites automatiques avec des calculs dynamiques à partir de la taille de la fenêtre et de l’image.
 
 <img src="/img/projet1(2).png" width="78%">
 
